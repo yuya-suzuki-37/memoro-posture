@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>姿勢診断 | Memoro</title>
+<meta name="description" content="写真2枚で、いまのあなたの立ち姿を解析。Memoro（メモロ）の無料・姿勢診断。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand center">Memoro<small>PHOTO WEDDING</small></div>
+</header>
+
+<!-- ===== HERO ===== -->
+<section class="hero wrap">
+  <p class="eyebrow">FREE POSTURE CHECK</p>
+  <h1>写真<span class="accent">2枚</span>で、<br>いまの立ち姿を解析します</h1>
+  <p class="lead">正面と横向きの写真をアップするだけ。面倒な質問はありません。AIがあなたの姿勢のクセを読み取り、後ろ姿まで美しい“花嫁姿勢”への一歩をご提案します。</p>
+  <div class="hero-ornament" aria-hidden="true">
+    <span class="line"></span>
+    <span class="mark">✦</span>
+    <span class="line"></span>
+  </div>
+  <p class="hero-note">所要時間 約1分 ・ 完全無料 ・ 写真は端末内だけで処理</p>
+</section>
+
+<!-- ===== UPLOAD ===== -->
+<section class="section wrap" id="upload-section">
+  <div class="section-head">
+    <span class="num">STEP 01</span>
+    <h2>2枚の写真をアップ</h2>
+    <p>全身が写った写真だと、より正確に解析できます。（データは端末内で処理され、送信されません）</p>
+  </div>
+
+  <div class="uploads">
+    <!-- FRONT -->
+    <label class="drop" id="drop-front" for="file-front">
+      <span class="req">正面 / FRONT</span>
+      <svg class="pose-illust" viewBox="0 0 64 64" fill="none" stroke="#B4936A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="32" cy="13" r="6"/><path d="M32 19v22"/><path d="M20 27h24"/><path d="M32 41l-8 16"/><path d="M32 41l8 16"/>
+      </svg>
+      <h3>正面の写真</h3>
+      <p class="hint">まっすぐ立ち、正面から全身を撮影</p>
+      <span class="drop-cta">タップして選択・ドラッグ・貼り付け</span>
+      <input type="file" id="file-front" accept="image/*,.heic,.heif">
+    </label>
+
+    <!-- SIDE -->
+    <label class="drop" id="drop-side" for="file-side">
+      <span class="req">横向き / SIDE</span>
+      <svg class="pose-illust" viewBox="0 0 64 64" fill="none" stroke="#B4936A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="30" cy="13" r="6"/><path d="M30 19c0 8 4 12 4 22"/><path d="M30 27c4 1 8 2 10 4"/><path d="M34 41l-6 16"/><path d="M34 41l6 16"/>
+      </svg>
+      <h3>横向きの写真</h3>
+      <p class="hint">体の真横から全身を撮影（頭〜足まで）</p>
+      <span class="drop-cta">タップして選択・ドラッグ・貼り付け</span>
+      <input type="file" id="file-side" accept="image/*,.heic,.heif">
+    </label>
+  </div>
+
+  <div class="howto">
+    <div class="step"><div class="n">1</div><p>壁の前で、いつも通りの立ち方でOK</p></div>
+    <div class="step"><div class="n">2</div><p>できれば体のラインが分かる服装で</p></div>
+    <div class="step"><div class="n">3</div><p>誰かに撮ってもらう／三脚がおすすめ</p></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn" id="btn-analyze" disabled>姿勢を診断する</button>
+  </div>
+
+  <div class="loader" id="loader" hidden>
+    <div class="spinner"></div>
+    <p id="loader-text">読み込み中…</p>
+  </div>
+</section>
+
+<!-- ===== RESULT ===== -->
+<main class="section wrap" id="result" hidden></main>
+
+<footer class="foot">
+  <div class="brand serif">Memoro</div>
+  <p style="margin-top:10px">Photo Wedding &nbsp;/&nbsp; 無料姿勢診断</p>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
