@@ -3,8 +3,8 @@
 //   アップロード(選択/ドラッグ/貼付・HEIC対応) → 解析 → 結果描画
 // ===================================================================
 
-import { runDiagnosis, fileToImage } from './diagnosis.js';
-import { KNOWLEDGE, CAMPS } from './knowledge.js';
+import { runDiagnosis, fileToImage } from './diagnosis.js?v=2';
+import { KNOWLEDGE, CAMPS } from './knowledge.js?v=2';
 
 // フォトウェディングの個別相談/申込URL。'#' の間はCTAボタン非表示。
 const BOOKING_URL = '#';
