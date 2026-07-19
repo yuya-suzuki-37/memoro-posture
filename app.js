@@ -3,8 +3,8 @@
 //   アップロード(選択/ドラッグ/貼付・HEIC対応) → 解析 → 結果描画
 // ===================================================================
 
-import { runDiagnosis, fileToImage } from './diagnosis.js?v=2';
-import { KNOWLEDGE, CAMPS } from './knowledge.js?v=2';
+import { runDiagnosis, fileToImage } from './diagnosis.js?v=3';
+import { KNOWLEDGE, CAMPS } from './knowledge.js?v=3';
 
 // フォトウェディングの個別相談/申込URL。'#' の間はCTAボタン非表示。
 const BOOKING_URL = '#';
@@ -237,11 +237,15 @@ function findingsHTML(findings){
 
 function metricsHTML(metrics){
   if (!metrics || !metrics.length) return '';
+  const sevText = { good:'良好', warn:'やや注意', bad:'要ケア' };
   const rows = metrics.map(m=>`
     <div class="metric">
       <div class="metric-top">
         <span class="metric-name">${m.name}</span>
-        <span class="metric-val ${m.sev}">${m.value}</span>
+        <span class="metric-right">
+          <span class="metric-val ${m.sev}">${m.value}</span>
+          <span class="lvl-chip ${m.sev}">${sevText[m.sev]||''}</span>
+        </span>
       </div>
       <div class="metric-bar"><i class="${m.sev}" style="width:${Math.max(6,m.pct)}%"></i></div>
       <div class="metric-detail">${m.detail}</div>

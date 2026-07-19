@@ -206,8 +206,11 @@ button{ font-family:inherit; cursor:pointer; }
 .metric:last-child{ border-bottom:none; }
 .metric-top{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
 .metric-name{ font-weight:600; font-size:.92rem; }
+.metric-right{ display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
 .metric-val{ font-family:var(--serif); font-size:1.05rem; }
 .metric-val.good{ color:var(--good); } .metric-val.warn{ color:var(--warn); } .metric-val.bad{ color:var(--bad); }
+.lvl-chip{ font-size:.64rem; letter-spacing:.08em; padding:.28em .75em; border-radius:100px; color:#fff; }
+.lvl-chip.good{ background:var(--good); } .lvl-chip.warn{ background:var(--warn); } .lvl-chip.bad{ background:var(--bad); }
 .metric-bar{ height:7px; background:var(--bg-soft); border-radius:100px; margin:9px 0 6px; overflow:hidden; }
 .metric-bar i{ display:block; height:100%; border-radius:100px; background:var(--sage); }
 .metric-bar i.good{ background:var(--good); } .metric-bar i.warn{ background:var(--warn); } .metric-bar i.bad{ background:var(--bad); }
