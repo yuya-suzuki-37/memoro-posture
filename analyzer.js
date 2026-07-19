@@ -102,11 +102,15 @@ function analyzeSide(lms){
   // 旧指標も互換のため残す（耳-肩の垂直からの傾き）
   const fhAngle = Math.atan2(Math.abs(earFwd), neckH) * 180 / Math.PI;
 
-  // === 2. 巻き肩（肩-骨盤の前方シフト比）— _knowledge/02 ===
-  // ※FSA(52°)はC7必須で写真不可。肩が体幹に対しどれだけ前方かの比率を代理に。
-  const shOffset = forwardDir * (sh.x - hip.x);      // 肩が骨盤より前なら正
-  const rsRatio = shOffset / trunkLen;
-  const rsAngle = Math.atan2(Math.abs(shOffset), Math.abs(sh.y - hip.y)) * 180 / Math.PI;
+  // === 2. 巻き肩（肩の前方シフト）— _knowledge/02 ===
+  // ★プラムライン(足首の垂直線)基準に変更。上半身ごと前へ出ている人でも
+  //   巻き肩を取りこぼさないように、肩が足首よりどれだけ前かを主指標にする。
+  //   （旧: 肩vs骨盤 は上半身が丸ごと前傾すると差が出ず過小評価だった）
+  const shOffsetHip = forwardDir * (sh.x - hip.x);   // 肩が骨盤より前なら正（参考）
+  const shOffsetAnkle = forwardDir * (sh.x - ankle.x); // 肩が足首より前なら正（主指標）
+  const rsRatio = shOffsetAnkle / trunkLen;          // プラムライン基準の前方シフト比
+  const rsRatioHip = shOffsetHip / trunkLen;         // 旧指標（参考保持）
+  const rsAngle = Math.atan2(Math.abs(shOffsetHip), Math.abs(sh.y - hip.y)) * 180 / Math.PI;
 
   // === 3. 骨盤前後傾（相対推定）— _knowledge/04 ===
   // ASIS/PSIS不可のため相対推定。絶対角は断定しない。
@@ -140,6 +144,7 @@ function analyzeSide(lms){
       cva,
       forwardHeadAngle: fhAngle,
       roundedShoulderRatio: rsRatio,
+      roundedShoulderRatioHip: rsRatioHip,
       roundedShoulderAngle: rsAngle,
       pelvicTiltAngle: pelvicTilt,
       pelvicForward,
@@ -220,11 +225,12 @@ function detectProblems(sideRes, frontRes){
     }
   }
 
-  // 2. 巻き肩（肩前方シフト比）— _knowledge/02（FSA直接は写真不可のため代理）
-  if (m.roundedShoulderRatio != null && m.roundedShoulderRatio > 0.05) {
+  // 2. 巻き肩（肩の前方シフト・プラムライン基準）— _knowledge/02
+  //    肩が足首の垂直線よりどれだけ前かで判定（上半身ごと前傾も拾える）。
+  if (m.roundedShoulderRatio != null && m.roundedShoulderRatio > 0.12) {
     const r = m.roundedShoulderRatio;
-    const severity = r < 0.08 ? 'low' : r < 0.15 ? 'mid' : 'high';
-    problems.push(buildProblem('roundedShoulders', '巻き肩（肩甲骨前方位）', severity, (r*100).toFixed(1)+'%', r));
+    const severity = r < 0.22 ? 'low' : r < 0.35 ? 'mid' : 'high';
+    problems.push(buildProblem('roundedShoulders', '肩が前に巻く傾向', severity, (r*100).toFixed(0)+'%前方', r));
   }
 
   // 3. 猫背傾向（胸椎後弯）— _knowledge/03（真の後弯は写真不可・頭の前傾から推定）
@@ -374,14 +380,16 @@ function determinePostureType(problems){
   const hasKV = keys.includes('kneeValgus');
 
   if (hasFH && (hasRS || hasTK)) {
+    // 巻き肩(RS)が実際に検出されているかで名前を変える（無いのに「巻き肩」と言わない）
+    const frontWord = hasRS ? '巻き肩' : '猫背';
     if (hasAPT) {
-      return { name:'巻き肩＋反り腰タイプ',
-        desc:'頭が前に出て肩が巻き、さらに腰が反りやすい“複合タイプ”。スマホ・デスクワークの多い方に一番多いパターンです。胸まわりをほぐし、体幹を目覚めさせるのが近道。',
-        tags:['巻き肩','猫背ぎみ','反り腰'] };
+      return { name:`${frontWord}＋反り腰タイプ`,
+        desc:'頭が前に出て背中が丸まり、さらに腰が反りやすい“複合タイプ”。スマホ・デスクワークの多い方に一番多いパターンです。胸まわりをほぐし、体幹を目覚めさせるのが近道。',
+        tags:[frontWord, '頭が前', '反り腰'] };
     }
-    return { name:'巻き肩・猫背タイプ',
-      desc:'頭が前に出て、肩が内側に巻き、背中が丸まりやすいパターン。スマホやPCの時間が長い方に多い“現代型”。胸を開くケアで印象が変わりやすい部分です。',
-      tags:['巻き肩','猫背ぎみ','頭が前'] };
+    return { name:'頭が前・猫背タイプ',
+      desc:'頭が前に出て、背中が丸まりやすいパターン。スマホやPCの時間が長い方に多い“現代型”。首まわりと胸を開くケアで印象が変わりやすい部分です。',
+      tags: hasRS ? ['巻き肩','猫背ぎみ','頭が前'] : ['猫背ぎみ','頭が前'] };
   }
   if (hasAPT) {
     return { name:'反り腰タイプ',
@@ -442,10 +450,10 @@ function buildMetricsList(sideRes, frontRes){
     });
     list.push({
       name:'肩の前方シフト',
-      value: (m.roundedShoulderRatio*100).toFixed(1) + '%',
-      detail:'体幹の長さに対して肩がどれだけ前に出ているか（巻き肩の目安）。小さいほど良い',
-      pct: Math.min(100, m.roundedShoulderRatio * 400),
-      sev: m.roundedShoulderRatio < 0.05 ? 'good' : m.roundedShoulderRatio < 0.08 ? 'warn' : 'bad',
+      value: (m.roundedShoulderRatio*100).toFixed(0) + '%',
+      detail:'足首の垂直線に対して肩がどれだけ前に出ているか（巻き肩の目安）。小さいほど良い',
+      pct: Math.min(100, m.roundedShoulderRatio * 250),
+      sev: m.roundedShoulderRatio < 0.12 ? 'good' : m.roundedShoulderRatio < 0.22 ? 'warn' : 'bad',
     });
   }
   if (fm) {

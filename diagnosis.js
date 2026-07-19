@@ -8,7 +8,7 @@ import {
   analyzeSide, analyzeFront, detectProblems,
   determinePostureType, calcScore, gradeFromScore, buildMetricsList,
   SCREENING_DISCLAIMER,
-} from './analyzer.js?v=3';
+} from './analyzer.js?v=4';
 
 // ---------- MediaPipe (動く構成を踏襲: tasks-vision@0.10.9 / IMAGE mode) ----------
 let _landmarker = null;

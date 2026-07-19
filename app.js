@@ -3,8 +3,8 @@
 //   アップロード(選択/ドラッグ/貼付・HEIC対応) → 解析 → 結果描画
 // ===================================================================
 
-import { runDiagnosis, fileToImage } from './diagnosis.js?v=3';
-import { KNOWLEDGE, CAMPS } from './knowledge.js?v=3';
+import { runDiagnosis, fileToImage } from './diagnosis.js?v=4';
+import { KNOWLEDGE, CAMPS } from './knowledge.js?v=4';
 
 // フォトウェディングの個別相談/申込URL。'#' の間はCTAボタン非表示。
 const BOOKING_URL = '#';
@@ -152,6 +152,7 @@ function renderResult(res){
       ${myframeHTML(res)}
       ${findingsHTML(findings)}
       ${metricsHTML(metrics)}
+      ${debugHTML(res)}
       ${bridgeHTML(matched)}
       <div class="disclaimer">${disclaimer}</div>
       <div class="btn-row">
@@ -256,6 +257,32 @@ function metricsHTML(metrics){
       <h2>解析した数値</h2>
     </div>
     <div class="metrics">${rows}</div>`;
+}
+
+// 開発用・生の数値パネル（?debug=1 のときだけ表示。較正用）
+function debugHTML(res){
+  if (!/[?&]debug=1/.test(location.search)) return '';
+  const s = res.resultSide?.metrics || {}, f = res.resultFront?.metrics || {};
+  const row = (k,v)=>`<tr><td>${k}</td><td style="text-align:right;font-variant-numeric:tabular-nums">${typeof v==='number'?v.toFixed(3):v}</td></tr>`;
+  return `
+  <div style="margin-top:20px;background:#2E2A26;color:#EDE6DC;border-radius:14px;padding:18px;font-family:monospace;font-size:12px;overflow-x:auto">
+    <div style="color:#B4936A;letter-spacing:.1em;margin-bottom:8px">DEBUG · 生の測定値（較正用・?debug=1）</div>
+    <table style="width:100%;border-collapse:collapse">
+      ${row('頭の前傾角 forwardHeadAngle(°)', s.forwardHeadAngle)}
+      ${row('肩シフト・足首基準 rsRatio', s.roundedShoulderRatio)}
+      ${row('肩シフト・骨盤基準 rsRatioHip(旧)', s.roundedShoulderRatioHip)}
+      ${row('骨盤前後傾 pelvicTiltAngle(°)', s.pelvicTiltAngle)}
+      ${row('骨盤前方 pelvicForward', String(s.pelvicForward))}
+      ${row('骨盤vs足首 hipFwdOfAnkle', s.hipFwdOfAnkle)}
+      ${row('肩vs骨盤(後方) shoulderBehindHip', s.shoulderBehindHip)}
+      ${row('CVA(参考・非使用)', s.cva)}
+      ${row('肩の左右差 shoulderTilt(°)', f.shoulderTilt)}
+      ${row('骨盤の左右差 pelvicTilt(°)', f.pelvicTilt)}
+      ${row('頭の左右傾き headTilt(°)', f.headTilt)}
+      ${row('膝L kneeDev(°)', f.lKneeDev)}
+      ${row('膝R kneeDev(°)', f.rKneeDev)}
+    </table>
+  </div>`;
 }
 
 function bridgeHTML(matched){
