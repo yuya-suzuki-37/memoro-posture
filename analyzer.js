@@ -57,7 +57,13 @@ function angle3(a,b,c){
   return Math.acos(Math.min(1,Math.max(-1, dot/mag))) * 180 / Math.PI;
 }
 function horizAngleDeg(a,b){
-  return Math.atan2(b.y-a.y, b.x-a.x) * 180 / Math.PI; // 水平からの傾き
+  return Math.atan2(b.y-a.y, b.x-a.x) * 180 / Math.PI; // 線の向き（-180〜180）
+}
+// 水平線の点対は ±180° 付近に出るため、水平からのズレ（-90〜90・符号付き）に畳む
+function foldTilt(deg){
+  if (deg > 90) deg -= 180;
+  else if (deg < -90) deg += 180;
+  return deg;
 }
 
 // ========== SIDE VIEW (横向き写真) ==========
@@ -157,9 +163,12 @@ function analyzeFront(lms){
   const trunkH = dist(mid(lSh,rSh), mid(lHip,rHip));
 
   // 左右差（度）— _knowledge/09
-  const shoulderTilt = horizAngleDeg(lSh, rSh);
-  const pelvicTilt = horizAngleDeg(lHip, rHip);
-  const headTilt = horizAngleDeg(lEar, rEar);
+  // horizAngleDeg は線の向きなので、水平の点対は ±180° 付近に出る。
+  // foldTilt で「水平からのズレ（符号付き・約 -90〜90）」に正規化する。
+  // これをしないと肩/骨盤の左右差が 179° 等と出て誤検出になる。
+  const shoulderTilt = foldTilt(horizAngleDeg(lSh, rSh));
+  const pelvicTilt = foldTilt(horizAngleDeg(lHip, rHip));
+  const headTilt = foldTilt(horizAngleDeg(lEar, rEar));
 
   // 膝のフロンタル偏位（HKA近似）— _knowledge/07
   // dev = 180 - angle3(hip,knee,ankle)。方向は膝が hip-ankle 線の内/外どちらか。
@@ -199,12 +208,15 @@ function detectProblems(sideRes, frontRes){
   const m = sideRes?.metrics || {};
   const fm = frontRes?.metrics || null;
 
-  // 1. 頭部前方位（CVA < 50° = FHP / 小さいほど悪い）— _knowledge/01
-  if (m.cva != null) {
-    const cva = m.cva;
-    if (cva < 50) {
-      const severity = cva >= 45.5 ? 'low' : cva >= 40 ? 'mid' : 'high';
-      problems.push(buildProblem('forwardHead', '頭部前方位（前方頭位）', severity, cva.toFixed(1)+'°', cva));
+  // 1. 頭部前方位 — _knowledge/01
+  // ★C7近似に依存するCVA(絶対角)は写真では信頼できないため使わない。
+  //   代わりに「耳が肩よりどれだけ前か＝首の前傾角」を主指標にする（近似不要）。
+  //   forwardHeadAngle が大きいほど頭が前に出ている。
+  if (m.forwardHeadAngle != null) {
+    const fh = m.forwardHeadAngle;
+    if (fh > 13) {
+      const severity = fh < 20 ? 'low' : fh < 28 ? 'mid' : 'high';
+      problems.push(buildProblem('forwardHead', '頭が前に出る傾向', severity, fh.toFixed(0)+'°前傾', fh));
     }
   }
 
@@ -215,12 +227,12 @@ function detectProblems(sideRes, frontRes){
     problems.push(buildProblem('roundedShoulders', '巻き肩（肩甲骨前方位）', severity, (r*100).toFixed(1)+'%', r));
   }
 
-  // 3. 猫背（胸椎後弯）= CVA代理 — _knowledge/03（真の後弯は写真不可）
-  //    強い頭部前方位に併発する猫背"傾向"として推定。
-  if (m.cva != null && m.cva < 47) {
-    const cva = m.cva;
-    const severity = cva >= 43 ? 'low' : cva >= 38 ? 'mid' : 'high';
-    problems.push(buildProblem('thoracicKyphosis', '猫背傾向（胸椎後弯・推定）', severity, '推定', cva));
+  // 3. 猫背傾向（胸椎後弯）— _knowledge/03（真の後弯は写真不可・頭の前傾から推定）
+  //    頭が強めに前へ出ている場合に併発しやすい猫背"傾向"として推定。
+  if (m.forwardHeadAngle != null && m.forwardHeadAngle > 20) {
+    const fh = m.forwardHeadAngle;
+    const severity = fh < 26 ? 'low' : fh < 32 ? 'mid' : 'high';
+    problems.push(buildProblem('thoracicKyphosis', '背中が丸まる傾向（猫背・推定）', severity, '推定', fh));
   }
 
   // 4. 骨盤前後傾（相対推定）— _knowledge/04（絶対角は断定しない）
@@ -269,11 +281,12 @@ function detectProblems(sideRes, frontRes){
     }
 
     // 8. 側弯傾向（スクリーニングのみ）— _knowledge/06
-    // 肩と骨盤の傾きが逆方向（Cカーブ代償）かつ一定以上。受診勧奨に留める。
-    if (Math.abs(fm.shoulderTilt) > 3 && Math.abs(fm.pelvicTilt) > 5.6
+    // 肩と骨盤の傾きが逆方向（Cカーブ代償）かつ「はっきり大きい」時だけ。
+    // 健康な人を脅かさないよう閾値を高めに設定（軽い左右差では出さない）。
+    if (Math.abs(fm.shoulderTilt) > 5 && Math.abs(fm.pelvicTilt) > 8
         && Math.sign(fm.shoulderTilt) !== Math.sign(fm.pelvicTilt)) {
       const v = (Math.abs(fm.shoulderTilt) + Math.abs(fm.pelvicTilt)) / 2;
-      problems.push(buildProblem('scoliosis', '左右差（側弯傾向・要受診確認）', 'mid', v.toFixed(1)+'°', v));
+      problems.push(buildProblem('scoliosis', '左右差が大きめ', 'mid', v.toFixed(1)+'°', v));
     }
   }
 
@@ -362,35 +375,35 @@ function determinePostureType(problems){
 
   if (hasFH && (hasRS || hasTK)) {
     if (hasAPT) {
-      return { name:'上部交差＋下部交差症候群',
-        desc:'頭部前方位・巻き肩と反り腰が併存。デスクワーカーに最も多い「複合タイプ」。胸椎モビリティと股関節屈筋の解放が鍵。',
-        tags:['Upper Crossed Syndrome','Lower Crossed Syndrome','複合型'] };
+      return { name:'巻き肩＋反り腰タイプ',
+        desc:'頭が前に出て肩が巻き、さらに腰が反りやすい“複合タイプ”。スマホ・デスクワークの多い方に一番多いパターンです。胸まわりをほぐし、体幹を目覚めさせるのが近道。',
+        tags:['巻き肩','猫背ぎみ','反り腰'] };
     }
-    return { name:'上部交差症候群（Upper Crossed Syndrome）',
-      desc:'頭部前方位・胸椎後弯・肩甲骨前方位の典型パターン。Janda博士による分類。スマホ・PC作業で進行しやすい現代型。',
-      tags:['Upper Crossed Syndrome','頭部前方位','巻き肩'] };
+    return { name:'巻き肩・猫背タイプ',
+      desc:'頭が前に出て、肩が内側に巻き、背中が丸まりやすいパターン。スマホやPCの時間が長い方に多い“現代型”。胸を開くケアで印象が変わりやすい部分です。',
+      tags:['巻き肩','猫背ぎみ','頭が前'] };
   }
   if (hasAPT) {
-    return { name:'下部交差症候群（Lower Crossed Syndrome）',
-      desc:'腸腰筋・脊柱起立筋の短縮と、腹筋・臀筋の弱化が交差したパターン。反り腰・腰痛の温床。',
-      tags:['Lower Crossed Syndrome','反り腰','骨盤前傾'] };
+    return { name:'反り腰タイプ',
+      desc:'骨盤が前に傾き、腰が反りやすいパターン。太もも前や腰が張りやすく、下腹が前に出て見えやすい傾向です。お尻・お腹を使えるようにするのが鍵。',
+      tags:['反り腰','骨盤が前に'] };
   }
   if (hasSway) {
-    return { name:'スウェイバック姿勢',
-      desc:'骨盤を前に押し出し、上半身が後ろに倒れた「楽な立ち方」。靱帯と関節包に依存しやすい姿勢パターン。',
-      tags:['Sway Back','骨盤前方シフト'] };
+    return { name:'重心うしろ立ちタイプ',
+      desc:'骨盤を前に押し出して、上半身が少し後ろに倒れる“ラクな立ち方”。一見まっすぐでも疲れやすく、横からの立ち姿がだらっと見えやすいパターンです。',
+      tags:['スウェイバック','重心うしろ'] };
   }
   if (hasAsym || hasKV) {
-    return { name:'機能的左右非対称型',
-      desc:'肩・骨盤・膝のいずれかに左右差。生活習慣の偏り(片側荷重・足組み等)が関与するパターン。',
-      tags:['Lateral Asymmetry','機能不全'] };
+    return { name:'左右バランスタイプ',
+      desc:'肩・骨盤・脚のどこかに左右差が見られるパターン。カバンをいつも同じ肩に、片脚重心で立つ、といった生活のクセが関わることが多いです。',
+      tags:['左右差','生活グセ'] };
   }
   if (hasTK || hasRS){
-    return { name:'軽度猫背・巻き肩タイプ',
-      desc:'胸椎の柔軟性低下と肩甲骨周囲の弱化の傾向。早期介入で十分に改善が見込めます。',
-      tags:['軽症','胸椎モビリティ要'] };
+    return { name:'ゆる猫背タイプ',
+      desc:'背中がやや丸まり、肩まわりの支えが少しゆるんだ傾向。まだ軽めなので、早めのケアで十分に整えやすい状態です。',
+      tags:['猫背ぎみ','軽め'] };
   }
-  return { name:'良好な姿勢', desc:'明確な逸脱は見つかりません。維持メニューで現状をキープしましょう。', tags:['Good','維持期'] };
+  return { name:'美姿勢タイプ', desc:'大きな崩れは見つかりませんでした。この状態をキープしながら、写真映えする“花嫁姿勢”へさらに磨きをかけていきましょう。', tags:['バランス良好'] };
 }
 
 // ========== SCORE ==========
@@ -405,11 +418,11 @@ function calcScore(sideRes, frontRes, problems){
 }
 
 function gradeFromScore(s){
-  if (s >= 92) return { grade:'EXCELLENT', desc:'とても良好な姿勢。維持を心がけましょう。' };
-  if (s >= 82) return { grade:'GOOD',      desc:'良好な姿勢。微調整でさらに伸びしろあり。' };
-  if (s >= 70) return { grade:'FAIR',      desc:'いくつか改善ポイントあり。30日プログラムで改善が見込めます。' };
-  if (s >= 58) return { grade:'NEEDS WORK',desc:'複数の逸脱傾向を検出。集中的なケアがおすすめです。' };
-  return         { grade:'CHECK',          desc:'多面的な傾向を検出。気になる場合は専門家への相談も検討を。' };
+  if (s >= 92) return { grade:'EXCELLENT', desc:'とてもきれいな立ち姿。この状態をキープしていきましょう。' };
+  if (s >= 82) return { grade:'GOOD',      desc:'バランスの良い立ち姿。ちょっとした習慣でさらに磨けます。' };
+  if (s >= 70) return { grade:'FAIR',      desc:'気になるポイントがいくつか。毎日のケアで少しずつ変えていけます。' };
+  if (s >= 58) return { grade:'CARE',      desc:'いくつかのクセが見られます。まずはできることから整えていきましょう。' };
+  return         { grade:'CARE',           desc:'複数のクセが見られます。気になる点は無理なくケアしていきましょう。' };
 }
 
 // ========== METRICS DISPLAY ==========
@@ -418,18 +431,19 @@ function buildMetricsList(sideRes, frontRes){
   const m = sideRes?.metrics;
   const fm = frontRes?.metrics;
 
-  if (m && m.cva != null) {
+  if (m && m.forwardHeadAngle != null) {
+    const fh = m.forwardHeadAngle;
     list.push({
-      name:'頭頸角 CVA（推定）',
-      value: m.cva.toFixed(1) + '°',
-      detail:'臨床基準: 正常≥50° / 50°未満で頭部前方位（小さいほど前方位）',
-      pct: Math.min(100, Math.max(0, (65 - m.cva) / 30 * 100)),
-      sev: m.cva >= 50 ? 'good' : m.cva >= 45.5 ? 'warn' : 'bad',
+      name:'頭の前傾（耳と肩のズレ）',
+      value: fh.toFixed(0) + '°',
+      detail:'耳が肩よりどれだけ前に出ているか。小さいほど良い（目安：13°未満）',
+      pct: Math.min(100, fh / 35 * 100),
+      sev: fh < 13 ? 'good' : fh < 20 ? 'warn' : 'bad',
     });
     list.push({
       name:'肩の前方シフト',
       value: (m.roundedShoulderRatio*100).toFixed(1) + '%',
-      detail:'体幹長に対する肩の前方シフト率（巻き肩の代理指標）。正常<5%',
+      detail:'体幹の長さに対して肩がどれだけ前に出ているか（巻き肩の目安）。小さいほど良い',
       pct: Math.min(100, m.roundedShoulderRatio * 400),
       sev: m.roundedShoulderRatio < 0.05 ? 'good' : m.roundedShoulderRatio < 0.08 ? 'warn' : 'bad',
     });
